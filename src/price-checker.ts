@@ -6,15 +6,27 @@ const PRODUCT_URL = 'https://www.invitalshop.sk/chihiros-led-wrgb-ii-30-33w-30-4
 export async function fetchPrice(): Promise<string> {
   console.log(`[PriceChecker] Fetching price from: ${PRODUCT_URL}`);
 
-  const apiKey = process.env.SCRAPER_API_KEY;
-  const fetchUrl = apiKey
-    ? `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(PRODUCT_URL)}&render=true&premium=true`
-    : PRODUCT_URL;
+  const scraperApiKey = process.env.SCRAPER_API_KEY;
+  const scrapingBeeKey = process.env.SCRAPINGBEE_API_KEY;
 
-  console.log(`[PriceChecker] Using ${apiKey ? 'ScraperAPI' : 'direct fetch'}`);
+  let fetchUrl: string;
+  let label: string;
+
+  if (scrapingBeeKey) {
+    fetchUrl = `https://app.scrapingbee.com/api/v1?api_key=${scrapingBeeKey}&url=${encodeURIComponent(PRODUCT_URL)}&render_js=true&premium_proxy=true`;
+    label = 'ScrapingBee';
+  } else if (scraperApiKey) {
+    fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(PRODUCT_URL)}&render=true&premium=true`;
+    label = 'ScraperAPI';
+  } else {
+    fetchUrl = PRODUCT_URL;
+    label = 'direct fetch';
+  }
+
+  console.log(`[PriceChecker] Using ${label}`);
 
   const { data: html, status } = await axios.get<string>(fetchUrl, {
-    headers: apiKey ? {} : {
+    headers: (scraperApiKey || scrapingBeeKey) ? {} : {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
       'Accept-Language': 'sk-SK,sk;q=0.9',
     },
