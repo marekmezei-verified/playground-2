@@ -8,7 +8,7 @@ export async function fetchPrice(): Promise<string> {
 
   const apiKey = process.env.SCRAPER_API_KEY;
   const fetchUrl = apiKey
-    ? `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(PRODUCT_URL)}&render=true`
+    ? `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(PRODUCT_URL)}&render=true&premium=true`
     : PRODUCT_URL;
 
   console.log(`[PriceChecker] Using ${apiKey ? 'ScraperAPI' : 'direct fetch'}`);
