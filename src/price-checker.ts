@@ -13,7 +13,6 @@ export async function fetchPrice(): Promise<string> {
       'Accept-Language': 'sk-SK,sk;q=0.9,en-US;q=0.8,en;q=0.7',
       'Accept-Encoding': 'gzip, deflate, br',
       'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
       'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
     },
@@ -25,57 +24,36 @@ export async function fetchPrice(): Promise<string> {
 
   const $ = cheerio.load(html);
 
-  // Try common e-shop price selectors
-  const selectors = [
-    '[itemprop="price"]',
-    '.product-price .price',
-    '.product-price',
-    '.price-value',
-    '.current-price',
-    '.woocommerce-Price-amount',
-    '.product-detail-price',
-    '.price--default',
-    '#product-detail-price',
-    '.product-detail-price-container .price',
-    'meta[property="product:price:amount"]',
-  ];
-
-  for (const selector of selectors) {
-    const el = $(selector).first();
-    if (el.length) {
-      const text = el.text().trim();
-      if (text && /\d/.test(text)) {
-        const cleaned = text.replace(/[^\d,.\s€]/g, '').trim();
-        console.log(`[PriceChecker] Found price via selector "${selector}": ${cleaned}`);
-        return cleaned.includes('€') ? cleaned : `${cleaned} €`;
-      }
-      // Check content attribute (microdata / meta tags)
-      const content = el.attr('content');
-      if (content && /\d/.test(content)) {
-        console.log(`[PriceChecker] Found price via attribute on "${selector}": ${content} €`);
-        return `${content} €`;
-      }
-    }
+  // 1. Try meta tag with itemprop="price" (most reliable for this site)
+  const metaPrice = $('meta[itemprop="price"]').attr('content');
+  if (metaPrice && /\d/.test(metaPrice)) {
+    console.log(`[PriceChecker] Found price via meta itemprop: ${metaPrice} €`);
+    return `${metaPrice} €`;
   }
 
-  // Fallback: regex search for price patterns
+  // 2. Try price summary element
+  const priceSummary = $('[data-product-code]').first().text().trim();
+  if (priceSummary && /\d/.test(priceSummary)) {
+    console.log(`[PriceChecker] Found price via data-product-code: ${priceSummary}`);
+    return priceSummary.includes('€') ? priceSummary : `${priceSummary} €`;
+  }
+
+  // 3. Fallback: regex on raw HTML
   const pricePatterns = [
     /(\d{1,5}[,.]\d{2})\s*€/,
     /"price"\s*:\s*"?(\d+[.,]\d{2})"?/,
-    /content="(\d+[.,]\d{2})"/,
+    /content="(\d+[.,]\d{2})"\s*itemprop="price"/,
   ];
 
   for (const pattern of pricePatterns) {
     const match = html.match(pattern);
     if (match) {
       const price = `${match[1]} €`;
-      console.log(`[PriceChecker] Found price via regex fallback: ${price}`);
+      console.log(`[PriceChecker] Found price via regex: ${price}`);
       return price;
     }
   }
 
-  // Debug: log a snippet of the HTML to help diagnose
-  console.log(`[PriceChecker] DEBUG - First 2000 chars of HTML:\n${html.substring(0, 2000)}`);
-
+  console.log(`[PriceChecker] DEBUG - First 2000 chars:\n${html.substring(0, 2000)}`);
   throw new Error('Could not find the product price on the page.');
 }
