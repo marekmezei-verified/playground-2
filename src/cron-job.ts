@@ -2,9 +2,10 @@ import 'dotenv/config';
 import { fetchPrice } from './price-checker';
 import { notifyPrice } from './notifier';
 import { sendPriceEmail } from './email-sender';
+import { APP_VERSION } from './version';
 
 async function runCheck(): Promise<void> {
-  console.log(`[App] Running price check at ${new Date().toISOString()}`);
+  console.log(`[App] v${APP_VERSION} — Running price check at ${new Date().toISOString()}`);
   try {
     const price = await fetchPrice();
     console.log(`[App] Price fetched: ${price}`);

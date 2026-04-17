@@ -3,9 +3,10 @@ import cron from 'node-cron';
 import { fetchPrice } from './price-checker';
 import { notifyPrice } from './notifier';
 import { sendPriceEmail } from './email-sender';
+import { APP_VERSION } from './version';
 
 async function runCheck(): Promise<void> {
-  console.log(`[App] Running price check at ${new Date().toISOString()}`);
+  console.log(`[App] v${APP_VERSION} — Running price check at ${new Date().toISOString()}`);
   try {
     const price = await fetchPrice();
     console.log(`[App] Price fetched: ${price}`);
@@ -25,4 +26,4 @@ cron.schedule('0 8 * * *', () => {
   runCheck();
 });
 
-console.log('[App] Price checker started. Scheduled daily at 08:00.');
+console.log(`[App] v${APP_VERSION} — Price checker started. Scheduled daily at 08:00.`);
