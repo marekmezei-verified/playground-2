@@ -1,0 +1,13 @@
+services:
+  - type: cron
+    name: playground-2-price-checker
+    runtime: node
+    schedule: "0 8 * * *"  # Daily at 08:00 UTC
+    buildCommand: npm install && npm run build
+    startCommand: node dist/cron-job.js
+    envVars:
+      - key: RESEND_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: EMAIL_TO
+        sync: false
+
