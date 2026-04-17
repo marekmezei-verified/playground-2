@@ -1,59 +1,56 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 const PRODUCT_URL = 'https://www.invitalshop.sk/chihiros-led-wrgb-ii-30-33w-30-45cm-s-kontrolerom';
 
 export async function fetchPrice(): Promise<string> {
   console.log(`[PriceChecker] Fetching price from: ${PRODUCT_URL}`);
 
-  const { data: html, status } = await axios.get<string>(PRODUCT_URL, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'sk-SK,sk;q=0.9,en-US;q=0.8,en;q=0.7',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-    },
-    timeout: 30000,
-    maxRedirects: 5,
+  const isLocal = !process.env.RENDER;
+
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: { width: 1280, height: 720 },
+    executablePath: isLocal
+      ? (process.platform === 'win32'
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        : '/usr/bin/google-chrome')
+      : await chromium.executablePath(),
+    headless: true,
   });
 
-  console.log(`[PriceChecker] Response status: ${status}, HTML length: ${html.length}`);
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+    await page.goto(PRODUCT_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  const $ = cheerio.load(html);
+    const html = await page.content();
+    console.log(`[PriceChecker] Page loaded, HTML length: ${html.length}`);
 
-  // 1. Try meta tag with itemprop="price" (most reliable for this site)
-  const metaPrice = $('meta[itemprop="price"]').attr('content');
-  if (metaPrice && /\d/.test(metaPrice)) {
-    console.log(`[PriceChecker] Found price via meta itemprop: ${metaPrice} €`);
-    return `${metaPrice} €`;
-  }
-
-  // 2. Try price summary element
-  const priceSummary = $('[data-product-code]').first().text().trim();
-  if (priceSummary && /\d/.test(priceSummary)) {
-    console.log(`[PriceChecker] Found price via data-product-code: ${priceSummary}`);
-    return priceSummary.includes('€') ? priceSummary : `${priceSummary} €`;
-  }
-
-  // 3. Fallback: regex on raw HTML
-  const pricePatterns = [
-    /(\d{1,5}[,.]\d{2})\s*€/,
-    /"price"\s*:\s*"?(\d+[.,]\d{2})"?/,
-    /content="(\d+[.,]\d{2})"\s*itemprop="price"/,
-  ];
-
-  for (const pattern of pricePatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      const price = `${match[1]} €`;
-      console.log(`[PriceChecker] Found price via regex: ${price}`);
-      return price;
+    // 1. Try meta tag with itemprop="price"
+    const metaPrice = await page.$eval('meta[itemprop="price"]', el => el.getAttribute('content')).catch(() => null);
+    if (metaPrice && /\d/.test(metaPrice)) {
+      console.log(`[PriceChecker] Found price via meta itemprop: ${metaPrice} €`);
+      return `${metaPrice} €`;
     }
-  }
 
-  console.log(`[PriceChecker] DEBUG - First 2000 chars:\n${html.substring(0, 2000)}`);
-  throw new Error('Could not find the product price on the page.');
+    // 2. Try price summary element
+    const priceText = await page.$eval('[data-product-code]', el => el.textContent?.trim() ?? '').catch(() => '');
+    if (priceText && /\d/.test(priceText)) {
+      console.log(`[PriceChecker] Found price via data-product-code: ${priceText}`);
+      return priceText.includes('€') ? priceText : `${priceText} €`;
+    }
+
+    // 3. Regex fallback on full HTML
+    const match = html.match(/(\d{1,5}[,.]\d{2})\s*€/);
+    if (match) {
+      console.log(`[PriceChecker] Found price via regex: ${match[1]} €`);
+      return `${match[1]} €`;
+    }
+
+    console.log(`[PriceChecker] DEBUG - First 2000 chars:\n${html.substring(0, 2000)}`);
+    throw new Error('Could not find the product price on the page.');
+  } finally {
+    await browser.close();
+  }
 }

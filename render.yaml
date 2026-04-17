@@ -10,4 +10,5 @@ services:
         sync: false  # Set manually in Render dashboard
       - key: EMAIL_TO
         sync: false
-
+      - key: RENDER
+        value: "true"
